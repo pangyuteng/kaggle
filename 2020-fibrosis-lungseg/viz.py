@@ -57,7 +57,7 @@ HTML = '''
 </head>
 <body>
 {% for item in mylist %}
-<img src="{{item}} height=200px">
+<img src="{{item}}" height=400px>
 <hr>
 {% endfor %}
 </body>
