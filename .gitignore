@@ -2,3 +2,5 @@
 **/__pycache__/*
 2020-fibrosis-lungseg/*.png
 2020-fibrosis-lungseg/*.html
+2020-fibrosis-lungseg/logs/*
+2020-fibrosis-lungseg/html/*
