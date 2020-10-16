@@ -263,7 +263,7 @@ if __name__ == '__main__':
             lung_list.remove(patient)
 
     print('lung_list len',len(lung_list))
-    lung_list = lung_list[-10:] # demo purpose just use 10 series
+    lung_list = lung_list[-50:] # demo purpose just use 50 series
 
     # create image and mask nifti file.
     for patient in tqdm(lung_list):

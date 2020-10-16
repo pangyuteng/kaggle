@@ -49,7 +49,7 @@ print(myy_hat.shape)
 os.makedirs('html',exist_ok=True)
 mylist = []
 for x in range(batch_size):
-    fname = f'html/x_viz_test{x}.png'
+    basename = f'x_viz_test{x}.png'
     plt.figure(figsize=(20,10))
     plt.subplot(131)
     plt.imshow(myx[x,:].squeeze(),cmap='gray')
@@ -57,9 +57,9 @@ for x in range(batch_size):
     plt.imshow(myy[x,:].squeeze(),cmap='gray')
     plt.subplot(133)
     plt.imshow(myy_hat[x,:].squeeze(),cmap='gray')
-    plt.savefig(fname)
+    plt.savefig(os.path.join('html',basename))
     plt.close()
-    mylist.append(fname)
+    mylist.append(basename)
 
 # https://gist.github.com/wrunk/1317933
 HTML = '''

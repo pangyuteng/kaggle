@@ -52,22 +52,22 @@ class ImageSummaryCallback(tf.keras.callbacks.Callback):
         masks_hat = tf.cast(masks_hat, tf.uint8)
 
         with self.file_writer.as_default():
-            #for ix in range(masks_hat.shape[0]):
-            ix = 0                
+
+            #for ix in range(masks_hat.shape[0]):    
+            ix = 0
             img = imgs[ix,:]
             mask = masks[ix,:]
-            #print(ix,masks_hat.shape)
             masks_hat = masks_hat[ix,:]
 
             img_tensor = tf.expand_dims(img, 0)
             mask_tensor = tf.expand_dims(mask, 0)
             masks_hat_tensor = tf.expand_dims(masks_hat, 0)
 
-            #only post 1 out of every 1000 images to tensorboard
-            #if (ix % 32) == 0:
-            tf.summary.image(f'inputs/image{ix}', img_tensor, step=batch)
-            tf.summary.image(f'outputs/mask{ix}', mask_tensor, step=batch)
-            tf.summary.image(f'outputs/mask_hat{ix}', masks_hat_tensor, step=batch)
+            #only post 1 out of every x images to tensorboard
+            if (ix % 4) == 0:
+                tf.summary.image(f'x/image{ix}', img_tensor, step=batch)
+                tf.summary.image(f'y/mask{ix}', mask_tensor, step=batch)
+                tf.summary.image(f'y_hat/mask{ix}', masks_hat_tensor, step=batch)
 
             self.file_writer.flush()
 # https://keras.io/examples/vision/oxford_pets_image_segmentation/
