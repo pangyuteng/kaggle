@@ -1,4 +1,14 @@
+import os
+import random
+import numpy as np
 import tensorflow as tf
+def seed_everything(seed=2020):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+seed_everything(42)
+
 from tensorflow import keras
 from tensorflow.keras import layers
 
