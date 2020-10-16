@@ -9,16 +9,15 @@ docker run --gpus all -it -v /mnt/hd0/data/kaggle/2020-fibrosis:/kaggle/input/os
 
 ```
 python prepare.py
-python train.py
+CUDA_VISIBLE_DEVICES=0 python train.py
 python test.py
 python viz.py
 ```
 
 #### start tensorboard
-
-docker exec -it ${container_name}
+docker exec -it ${running-container}
 tensorboard --logdir=logs --bind_all
 
 #### start notebook
-
+docker exec -it ${running-container}
 jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root

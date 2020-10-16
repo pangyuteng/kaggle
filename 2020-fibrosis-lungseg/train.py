@@ -1,3 +1,6 @@
+import os
+import sys
+import yaml
 import json
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
@@ -7,7 +10,6 @@ from prepare import (
     raw_list_path,
     MyDataGenerator,
 )
-from model import get_my_model
 
 with open(raw_list_path,'r') as f:
     raw_list = json.loads(f.read())
@@ -20,40 +22,46 @@ print(len(X_train))
 print(len(X_val))
 print(len(X_test))
 
-# training hyper parameters
-lr = 0.01
-batch_size = 8
-epochs = 5
-
-def bc_loss(y_true, y_pred):
-    return tf.math.reduce_mean(tf.keras.losses.binary_crossentropy(y_true, y_pred))
-
-def my_loss():
-    def loss(y_true, y_pred):
-        return bc_loss(y_true, y_pred)
-    return loss
-
 
 if __name__ == '__main__':
+    
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e','--exp_name', type=str,default='0')
+    args = parser.parse_args()
+    exp_name = args.exp_name
+
+    exp_folder = f"/kaggle/temp/exp/{exp_name}"
+    os.makedirs(exp_folder,exist_ok=True)
+    model_path = os.path.join(exp_folder,"model.h5")
+    history_path = os.path.join(exp_folder,'history.yaml')
+
     keras.backend.clear_session()
 
-    model = get_my_model()
+    if exp_name == '0':
+        from model import MyModelBuilder,batch_size,epochs
+    else:
+        raise NotImplementedError()
+    
+    builder = MyModelBuilder()
+    model = builder.build()
 
-    opt = keras.optimizers.Adam(learning_rate=lr)
-    model.compile(optimizer=opt, loss=my_loss())
+    # Train the model, doing validation at the end of each epoch.
+    train_gen = MyDataGenerator(X_train[:63],batch_size=batch_size)
+    val_gen = MyDataGenerator(X_val)
+    log_dir = f'logs/{exp_name}'
 
     callbacks = [
-        keras.callbacks.ModelCheckpoint("/kaggle/temp/mymodel.h5", save_best_only=True),
+        keras.callbacks.ModelCheckpoint(model_path, save_best_only=True),
+        builder.get_image_summary_callback(val_gen,log_dir),
         keras.callbacks.TensorBoard(
-            log_dir='logs', histogram_freq=0, write_graph=True, write_images=False,
+            log_dir=log_dir, histogram_freq=0, write_graph=True, write_images=False,
             update_freq='epoch', profile_batch=2, embeddings_freq=0,
         )
     ]
 
-    # Train the model, doing validation at the end of each epoch.
-    train_gen = MyDataGenerator(X_train,batch_size=batch_size)
-    val_gen = MyDataGenerator(X_val)
     history = model.fit(train_gen,epochs=epochs, validation_data=val_gen, callbacks=callbacks)
 
-    with open('history.yaml','w') as f:
+    with open(history_path,'w') as f:
         f.write(yaml.dump(history.history))

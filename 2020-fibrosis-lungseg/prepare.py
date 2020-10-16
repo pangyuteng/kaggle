@@ -1,12 +1,15 @@
 import os, sys
-import json
+import traceback
 from tqdm import tqdm
+import json
+import copy
 
 import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 
+import imageio
 from scipy import ndimage
 from skimage import measure
 import SimpleITK as sitk
@@ -31,18 +34,18 @@ aug_pipeline = A.Compose([
 ])
 
 def readimage(image_file,mask_file,augment):
-
-    _x_sample = np.load(image_file).astype(np.float)
-    x_sample = np.copy(_x_sample)
-    
-    y_mask = np.load(mask_file)
-    y_mask = y_mask.astype(np.float)
+    x_sample = np.load(image_file).astype(np.float)
+    y_mask = np.load(mask_file).astype(np.float)
     
     minval,maxval = -1000,1000
     x_sample = (x_sample-minval)/(maxval-minval)
     x_sample = x_sample.clip(0,1)
-        
-    
+
+    if not augment:
+        x_sample = np.expand_dims(x_sample,axis=-1)
+        y_sample = np.expand_dims(y_mask,axis=-1)
+        return x_sample, y_sample
+
     augmented = aug_pipeline(
         image=x_sample,
         mask=y_mask,
@@ -62,8 +65,8 @@ from tensorflow.keras.utils import Sequence
 class MyDataGenerator(Sequence):
     def __init__(self,data_list,batch_size=8,shuffle=True,augment=False):
         
-        self.x = np.array([x['img'] for x in data_list])
-        self.y = np.array([x['mask'] for x in data_list])
+        self.x = np.array([x['npy_img'] for x in data_list])
+        self.y = np.array([x['npy_mask'] for x in data_list])
 
         self.indices = np.arange(len(self.y))
         self.batch_size = batch_size
@@ -106,7 +109,6 @@ import SimpleITK as sitk
 import pydicom
 import traceback
 from scipy import ndimage
-
 def get_slice_location(dcm_file):
     ds = pydicom.dcmread(dcm_file)
     try:
@@ -125,12 +127,11 @@ def imread(fpath):
         dicom_names = [x[0] for x in file_loc_list]
 
         # check if intercept and slope is your typical 
-        dcm = pydicom.dcmread(dicom_names[-1])
-        b = dcm.RescaleIntercept
-        m = dcm.RescaleSlope
+        ds = pydicom.dcmread(dicom_names[-1])
+        b = ds.RescaleIntercept
+        m = ds.RescaleSlope
         if (b,m) != (-1024, 1):
-            raise ValueError(f'bad ct dicom! {fpath}')
-
+            raise ValueError(f'bad rescale slope! {fpath}')
 
         reader = sitk.ImageSeriesReader()
         reader.SetFileNames(dicom_names)
@@ -212,19 +213,57 @@ if __name__ == '__main__':
 
     img_root = os.path.join(temp_dir,'image_nii')
     mask_root = os.path.join(temp_dir,'mask_nii')
-    raw_img_root = os.path.join(temp_dir,'slice','img')
-    raw_mask_root = os.path.join(temp_dir,'slice','mask')
+
+    # scaled
+    png_img_root = os.path.join(temp_dir,'png','img')
+    png_mask_root = os.path.join(temp_dir,'png','mask')
+
+    # unscaled
+    npy_img_root = os.path.join(temp_dir,'npy','img')
+    npy_mask_root = os.path.join(temp_dir,'npy','mask')
 
     os.makedirs(img_root,exist_ok=True)
     os.makedirs(mask_root,exist_ok=True)
-    os.makedirs(raw_img_root,exist_ok=True)
-    os.makedirs(raw_mask_root,exist_ok=True)
 
-    # perform lung seg.
+    os.makedirs(png_img_root,exist_ok=True)
+    os.makedirs(png_mask_root,exist_ok=True)
+
+    os.makedirs(npy_img_root,exist_ok=True)
+    os.makedirs(npy_mask_root,exist_ok=True)
+
+    
     train_ids = sorted(os.listdir(train_folder))
     my_folder = train_folder
 
-    lung_list = train_ids[-2:]
+    lung_list = []
+    for patient in train_ids:
+        fpath = os.path.join(my_folder,patient)
+        count = len(os.listdir(fpath))
+        if 50 < count < 300: # demo purpose, trim down list
+            lung_list.append(patient)
+
+    print('lung_list len',len(lung_list))
+    tmp_lung_list = copy.copy(lung_list)
+    for patient in tqdm(tmp_lung_list):
+        try:
+            fpath = os.path.join(my_folder,patient)
+            dicom_names = [os.path.join(fpath,x) for x in os.listdir(fpath)]
+            # check if intercept and slope is your typical 
+            ds = pydicom.dcmread(dicom_names[-1])
+            b = ds.RescaleIntercept
+            m = ds.RescaleSlope
+
+            if (b,m) != (-1024, 1): # didn't want to bother with those with non standard ct slopes.
+                raise ValueError(f'bad rescale slope! {fpath}')
+            if ds.pixel_array.shape != (512,512): # lung seg only works with 512, FOV for >=768 is odd.
+                raise ValueError(f'bad shape! {fpath}')
+
+        except:
+            traceback.print_exc()
+            lung_list.remove(patient)
+
+    print('lung_list len',len(lung_list))
+    lung_list = lung_list[-10:] # demo purpose just use 10 series
 
     # create image and mask nifti file.
     for patient in tqdm(lung_list):
@@ -236,6 +275,7 @@ if __name__ == '__main__':
             continue
 
         img,spacing,origin,direction = _read_img(my_folder,patient)
+        # perform naive lung seg.
         mask = get_lung_mask(img)
             
         mask = mask.astype(np.uint8)
@@ -251,35 +291,44 @@ if __name__ == '__main__':
         print(len(lung_list))
         for patient in tqdm(lung_list):
 
-            uid = patient
-            axial_img_path = os.path.join(raw_img_root,f'img_{uid}_0.npy')
-            axial_mask_path = os.path.join(raw_mask_root,f'mask_{uid}_0.npy')
-
-            tmp=dict(
-                img=axial_img_path,
-                mask=axial_mask_path,
-            )
-            if tmp in raw_list:
-                continue
-            
             img_path = os.path.join(img_root,f'{patient}.nii.gz')
             lung_mask_path = os.path.join(mask_root,f'{patient}.nii.gz')
 
             img,spacing,origin,direction = imread(img_path)
-            mask,spacing,origin,direction = imread(lung_mask_path)
+            img = img.astype(np.int16) # typical ct data type
             
+            mask,spacing,origin,direction = imread(lung_mask_path)
+            mask = mask.astype(np.uint8)
+
+            # scale image from -1000,1000 to 0,255 (optional)
+            img_uint8 = ((img+1000)/2000).clip(0,1)*255
+            img_uint8 = img_uint8.astype(np.uint8)
+            mask_uint8 = (mask*255).clip(0,255).astype(np.uint8)
+
             for x in range(img.shape[0]):
                 try:
-                    axial_img_path = os.path.join(raw_img_root,f'img_{uid}_{x}.npy')
-                    axial_mask_path = os.path.join(raw_mask_root,f'mask_{uid}_{x}.npy')
-                    axial_img = img[x,:,:].squeeze().astype(np.int16)
-                    axial_mask = mask[x,:,:].squeeze().astype(np.uint8)
-                    np.save(axial_img_path,axial_img)
-                    np.save(axial_mask_path,axial_mask)
-                    
+
+                    # NPY
+                    npy_axial_img = img[x,:,:].squeeze()
+                    npy_axial_mask = mask[x,:,:].squeeze()
+                    npy_axial_img_path = os.path.join(npy_img_root,f'img_{patient}_{x}.npy')
+                    npy_axial_mask_path = os.path.join(npy_mask_root,f'mask_{patient}_{x}.npy')
+                    np.save(npy_axial_img_path,npy_axial_img)
+                    np.save(npy_axial_mask_path,npy_axial_mask)
+
+                    # PNG
+                    png_axial_img = img_uint8[x,:,:].squeeze()
+                    png_axial_mask = mask_uint8[x,:,:].squeeze()
+                    png_axial_img_path = os.path.join(png_img_root,f'img_{patient}_{x}.png')
+                    png_axial_mask_path = os.path.join(png_mask_root,f'mask_{patient}_{x}.png')
+                    imageio.imwrite(png_axial_img_path,png_axial_img)
+                    imageio.imwrite(png_axial_mask_path,png_axial_mask)
+
                     raw_list.append(dict(
-                        img=axial_img_path,
-                        mask=axial_mask_path,
+                        npy_img=npy_axial_img_path,
+                        npy_mask=npy_axial_mask_path,
+                        png_img=png_axial_img_path,
+                        png_mask=png_axial_mask_path,
                     ))
                 except:
                     pass
@@ -294,7 +343,7 @@ if __name__ == '__main__':
     batch_size = 15
     dg = MyDataGenerator(raw_list,batch_size=batch_size)
     print(len(dg))
-    myx,myy = dg[4]
+    myx,myy = dg[2]
     print(myx.shape,myy.shape)
     
     for x in range(batch_size):

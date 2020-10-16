@@ -1,3 +1,13 @@
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-e','--exp_name', type=str,default='0')
+args = parser.parse_args()
+exp_name = args.exp_name
+exp_folder = f"/kaggle/temp/exp/{exp_name}"
+model_path = os.path.join(exp_folder,"model.h5")
+history_path = os.path.join(exp_folder,'history.yaml')
+
+
 import json
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
@@ -28,7 +38,7 @@ print(len(X_test))
 model = get_my_model()
 opt = keras.optimizers.Adam()
 model.compile(optimizer=opt, loss=my_loss())
-model.load_weights("/kaggle/temp/mymodel.h5")
+model.load_weights(model_path)
 
 batch_size = 32
 test_gen = MyDataGenerator(X_test,batch_size=batch_size)
