@@ -41,10 +41,12 @@ class ImageSummaryCallback(tf.keras.callbacks.Callback):
                 mask = masks[ix,:]
                 img_tensor = tf.expand_dims(img, 0)
                 mask_tensor = tf.expand_dims(mask, 0)
+
                 #only post 1 out of every 1000 images to tensorboard
                 if (ix % 32) == 0:
                     tf.summary.image(f'inputs/image{ix}', img_tensor, step=batch)
                     tf.summary.image(f'outputs/mask{ix}', mask_tensor, step=batch)
+                    #tf.summary.image(f'pred/mask{ix}', mask_tensor, step=batch)
             self.file_writer.flush()
 # https://keras.io/examples/vision/oxford_pets_image_segmentation/
 

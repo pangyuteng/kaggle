@@ -1,11 +1,23 @@
+import os
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-e','--exp_name', type=str,default='0')
 args = parser.parse_args()
 exp_name = args.exp_name
 exp_folder = f"/kaggle/temp/exp/{exp_name}"
+test_path = os.path.join(exp_folder,"test.json")
 model_path = os.path.join(exp_folder,"model.h5")
 history_path = os.path.join(exp_folder,'history.yaml')
+
+if exp_name == '0':
+    from model import MyModelBuilder,batch_size,epochs
+else:
+    raise NotImplementedError()
+
+builder = MyModelBuilder()
+model = builder.build()
+model.load_weights(model_path)
+
 
 import json
 from sklearn.model_selection import train_test_split
@@ -16,8 +28,6 @@ from prepare import (
     raw_list_path,
     MyDataGenerator,
 )
-from model import get_my_model
-from train import my_loss
 
 with open(raw_list_path,'r') as f:
     raw_list = json.loads(f.read())
@@ -29,12 +39,6 @@ print('6:2:2')
 print(len(X_train))
 print(len(X_val))
 print(len(X_test))
-
-# Build model
-model = get_my_model()
-opt = keras.optimizers.Adam()
-model.compile(optimizer=opt, loss=my_loss())
-model.load_weights(model_path)
 
 batch_size = 32
 train_gen = MyDataGenerator(X_train,batch_size=batch_size)
@@ -50,7 +54,7 @@ for kind,gen in [
     out = model.evaluate(gen)
     mydict[kind]=out
 
-with open('test.json','w') as f:
+with open(test_path,'w') as f:
     f.write(json.dumps(mydict))
 
 print(mydict)

@@ -1,3 +1,4 @@
+import os
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-e','--exp_name', type=str,default='0')
@@ -5,7 +6,15 @@ args = parser.parse_args()
 exp_name = args.exp_name
 exp_folder = f"/kaggle/temp/exp/{exp_name}"
 model_path = os.path.join(exp_folder,"model.h5")
-history_path = os.path.join(exp_folder,'history.yaml')
+
+if exp_name == '0':
+    from model import MyModelBuilder,batch_size,epochs
+else:
+    raise NotImplementedError()
+
+builder = MyModelBuilder()
+model = builder.build()
+model.load_weights(model_path)
 
 
 import json
@@ -19,9 +28,6 @@ from prepare import (
     raw_list_path,
     MyDataGenerator,
 )
-from model import get_my_model
-from train import my_loss
-
 
 with open(raw_list_path,'r') as f:
     raw_list = json.loads(f.read())
@@ -34,21 +40,16 @@ print(len(X_train))
 print(len(X_val))
 print(len(X_test))
 
-# Build model
-model = get_my_model()
-opt = keras.optimizers.Adam()
-model.compile(optimizer=opt, loss=my_loss())
-model.load_weights(model_path)
 
 batch_size = 32
 test_gen = MyDataGenerator(X_test,batch_size=batch_size)
 myx,myy = test_gen[0]
 myy_hat = model.predict(myx)
 print(myy_hat.shape)
-
+os.makedirs('html',exist_ok=True)
 mylist = []
 for x in range(batch_size):
-    fname = f'x_viz_test{x}.png'
+    fname = f'html/x_viz_test{x}.png'
     plt.figure(figsize=(20,10))
     plt.subplot(131)
     plt.imshow(myx[x,:].squeeze(),cmap='gray')
@@ -73,6 +74,6 @@ HTML = '''
 </body>
 </html>
 '''
-with open('x_viz_test.html','w') as f:
+with open('html/x_viz_test.html','w') as f:
     html = Environment().from_string(HTML).render(mylist=mylist)
     f.write(html)
