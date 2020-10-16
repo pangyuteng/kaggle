@@ -48,7 +48,7 @@ if __name__ == '__main__':
     model = builder.build()
 
     # Train the model, doing validation at the end of each epoch.
-    train_gen = MyDataGenerator(X_train[:63],batch_size=batch_size)
+    train_gen = MyDataGenerator(X_train,batch_size=batch_size)
     val_gen = MyDataGenerator(X_val)
     log_dir = f'logs/{exp_name}'
 
