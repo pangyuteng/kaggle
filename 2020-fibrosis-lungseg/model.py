@@ -76,9 +76,11 @@ class ImageSummaryCallback(tf.keras.callbacks.Callback):
 class MyModelBuilder():
     def __init__(self):
         pass
-    def build(self,compile=True):
-        img_size = (512,512)
-        num_classes = 1
+    def build(self,
+            compile=True,
+            img_size=(512,512),
+            num_classes=1,
+            ):
         
         inputs = keras.Input(shape=img_size + (1,))
 
@@ -126,7 +128,7 @@ class MyModelBuilder():
             previous_block_activation = x  # Set aside next residual
         
         # Add a per-pixel classification layer
-        outputs = layers.Conv2D(num_classes, 3, activation="linear", padding="same")(x)    
+        outputs = layers.Conv2D(num_classes, 3, activation="sigmoid", padding="same")(x)
         
         # Define the model
         model = keras.Model(inputs, outputs)
@@ -146,6 +148,20 @@ class MyModelBuilder():
 if __name__ == '__main__':
     #keras.backend.clear_session()
     # Build model
-    model = MyModelBuilder().build()
-    model.summary()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d','--debug',action='store_true')
+    args = parser.parse_args()
 
+    if args.debug:
+        model = MyModelBuilder().build(img_size=(28,28))
+        model.summary()
+
+        (X_train, y_train), (X_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+        X_train, X_test = X_train/255, X_test/255
+        history = model.fit(x=X_train, y=X_train, batch_size=10,epochs=10, validation_data=(X_test, X_test))
+
+    else:
+
+        model = MyModelBuilder().build()
+        model.summary()
